@@ -42,49 +42,6 @@ class FetchGene:
             for alias in alias_list:
                 if alias.text.strip() != '':
                     extracted['alias'] += ' '+alias.text
-                    
-        '''
-        go_root = gene.xpath('Entrezgene_properties/Gene-commentary/Gene-commentary_heading[.="GeneOntology"]/../Gene-commentary_comment/Gene-commentary')
-        if len(go_root) > 0:
-            go = {}
-            extracted['go_terms'] = []
-            for cat in go_root:
-                go_type = cat.xpath('Gene-commentary_label/text()')[0]
-                terms = cat.xpath('Gene-commentary_comment/Gene-commentary')
-                prev_term_id = ''
-                for t in terms:
-                    go = {}
-                    go['type'] = go_type.lower()
-                    go['go_id'] = t.xpath('Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text()')[0]
-                    go['go_term'] = t.xpath('Gene-commentary_source/Other-source/Other-source_anchor/text()')[0]
-                    if prev_term_id != go['go_id']:
-                        extracted['go_terms'].append(go)
-                    prev_term_id = go['go_id']
-                
-        homologene_id = gene.xpath('Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text()')
-        
-        if len(homologene_id) > 0:
-            hurl = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=homologene&retmode=xml&id="
-            try:
-                hdom = etree.parse(urlopen(hurl+homologene_id[0])).getroot()
-            except URLError:
-                print "error in URL: "+URLError.reason
-            
-            genes = hdom.xpath('HG-Entry/HG-Entry_genes/HG-Gene')
-            hg = {}
-            extracted['homologs'] = []
-            for g in genes:
-                hg['organism'] = g.xpath('HG-Gene_taxid/text()')
-                if len(hg['organism']) > 0:
-                    hg['organism'] = hg['organism'][0]
-                hg['homolog_entrez_id'] = g.xpath('HG-Gene_geneid/text()')
-                if len(hg['homolog_entrez_id']) > 0:
-                    hg['homolog_entrez_id'] = hg['homolog_entrez_id'][0]
-                hg['symbol'] = g.xpath('HG-Gene_symbol/text()')
-                if len(hg['symbol']) > 0:
-                    hg['symbol'] = hg['symbol'][0]
-                extracted['homologs'].append(hg)
-        '''
         
         return extracted
     
@@ -105,10 +62,10 @@ class FetchReference:
         else:
             return None
     
-    def fetchPubmed(self, pubmed):
+    def fetchPubmed(self, pubmed, withTerms=False):
         "Use a pubmed ID to fetch a reference from the PubMed database"
         
-        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&tool=DigitalAgeingAtlas&retmode=xml&id="
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&tool=FetchScript&retmode=xml&id="
         try:
             dom = etree.parse(urlopen(url+str(pubmed))).getroot()
         except URLError as e:
@@ -119,14 +76,26 @@ class FetchReference:
             
             extracted = {}
             extracted['pubmed'] = pubmed
-            extracted['title'] = self.__ie(article.xpath('ArticleTitle/text()'))
-            extracted['volume'] = self.__ie(article.xpath('Journal/JournalIssue/Volume/text()'))
-            extracted['journal'] = self.__ie(article.xpath('Journal/ISOAbbreviation/text()'))
-            
-            if self.__ie(article.xpath('Journal/JournalIssue/PubDate/Year/text()')) is not None:
-                extracted['year'] = article.xpath('Journal/JournalIssue/PubDate/Year/text()')[0]
+            extracted['title'] = article.xpath('string(ArticleTitle/text())')
+            extracted['volume'] = article.xpath('string(Journal/JournalIssue/Volume/text())')
+            extracted['issue'] = article.xpath('string(Journal/JournalIssue/Issue/text())')
+            if article.xpath('string(Journal/ISOAbbreviation/text())') == '':
+                extracted['journal'] = article.xpath('string(Journal/Title/text())')
             else:
-                extracted['year'] = self.__ie(article.xpath('Journal/JournalIssue/PubDate/MedlineDate/text()'), makeNum=True)
+                extracted['journal'] = article.xpath('string(Journal/ISOAbbreviation/text())')
+
+            if article.xpath('string(Journal/JournalIssue/PubDate/Year/text())') != '':
+                extracted['year'] = article.xpath('string(Journal/JournalIssue/PubDate/Year/text())')
+            else:
+                raw_date = article.xpath('string(Journal/JournalIssue/PubDate/MedlineDate/text())')
+                if raw_date != '':
+                    find_date = re.search(r'([0-9]{4})', raw_date)
+                    if find_date:
+                        extracted['year'] = find_date.group(1)
+                    else:
+                        extracted['year'] = self.__ie(article.xpath('Journal/JournalIssue/PubDate/MedlineDate/text()'), makeNum=True)
+                else:
+                    extracted['year'] = self.__ie(article.xpath('Journal/JournalIssue/PubDate/MedlineDate/text()'), makeNum=True)
             
             pages = article.xpath('string(Pagination/MedlinePgn/text())')
             if '-' in pages:
@@ -136,44 +105,73 @@ class FetchReference:
                 extracted['pages'] = pages
                 
             authors = article.xpath('AuthorList')[0]
+            firstName1stAuthor = authors[0].xpath('string(ForeName/text())') if authors[0].xpath('string(ForeName/text())') != '' else authors[0].xpath('string(FirstName/text())')
+            lastName1stAuthor = authors[0].xpath('string(LastName/text())') if authors[0].xpath('string(LastName/text())') != '' else authors[0].xpath('string(LastName/text())')
+            initials1stAuthor = authors[0].xpath('string(Initials/text())')
             if len(authors) > 2:
-                extracted['author'] = authors[0].xpath('LastName/text()')[0]+' et al'
+                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+' et al.'
+                extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+' et al.'
             elif len(authors) == 2:
-                extracted['author'] = authors[0].xpath('LastName/text()')[0]+' and '+authors[1].xpath('LastName/text()')[0]
+                firstName2ndAuthor = authors[1].xpath('string(ForeName/text())') if authors[1].xpath('string(ForeName/text())') != '' else authors[1].xpath('string(FirstName/text())')
+                lastName2ndAuthor = authors[1].xpath('string(LastName/text())') if authors[1].xpath('string(LastName/text())') != '' else authors[1].xpath('string(LastName/text())')
+                initials2ndAuthor = authors[1].xpath('string(Initials/text())')
+                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+' and '+lastName2ndAuthor+', '+initials2ndAuthor
+                extracted['author_initials'] = lastName1stAuthor+', '+'.'.join(list(initials1stAuthor))+'. and '+lastName2ndAuthor+', '+'.'.join(list(initials2ndAuthor))+'.'
             else:
-                if authors[0].xpath('ForeName/text()') > 0:
-                    firstName = authors[0].xpath('ForeName/text()')[0]
-                elif authors[0].xpath('FirstName/text()') > 0:
-                    firstName = authors[0].xpath('FirstName/text()')[0]
-                else:
-                    firstName = "";
-                extracted['author'] = authors[0].xpath('LastName/text()')[0]+' '+firstName
-                
+                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+'.'
+                extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+'.'
+
+            pubTypes = article.xpath('PublicationTypeList/PublicationType')
+            for ptype in pubTypes:
+                pt = ptype.xpath('string(text())')
+                if pt == 'Review':
+                    extracted['review'] = 1
+
+            if withTerms:
+                extracted['terms'] = []
+                meshTerms = dom.xpath('/PubmedArticleSet/PubmedArticle/MedlineCitation/MeshHeadingList/MeshHeading')
+                for t in meshTerms:
+                    currentTerm = ''
+                    for s in t:
+                        currentTerm += s.text+'/'
+                    extracted['terms'].append(currentTerm.rstrip('/'))
             return extracted
         return {}
-
-class FetchDetails:
     
-    def entrezToUniProtID(self, entrez_id):
-        "Take an EntrezGene ID and convert to a corrosponding UniProt ID"
-        url = 'http://www.uniprot.org/mapping/'
-        params = {
-            'from': 'P_ENTREZGENEID',
-            'to': 'ID',
-            'format': 'list',
-            'query': str(entrez_id),
-        }
-        data = urlencode(params)
-        request = Request(url, data)
-        try:
-            response = urlopen(request)
-        except URLError as e:
-            print "URL Error: {0}".format(e.reason)
-            return None
-        
-        rsplit = response.read().split(None, 1)
-        return rsplit[0]
+class FetchDetails:
 
+    def translateID(self, id, translate_from, translate_to):
+        allowed_translations = (
+            'P_ENTREZGENEID', # Entrez gene ID
+            'ID', # UniProt ID - !! can only translate TO !!
+            'ACC+ID', # UniProt acc or ID - !! can only translate FROM !!
+            'P_REFSEQ_AC', # RefSeq protein acc
+            'REFSEQ_NT_ID', # RefSeq nucleotide acc
+        )
+        url = 'http://www.uniprot.org/mapping/'
+        if translate_from in allowed_translations and translate_to in allowed_translations:
+            params = {
+                'from': translate_from, #'P_ENTREZGENEID',
+                'to': translate_to, #'ACC+ID',
+                'format': 'list',
+                'query': str(id),
+            }
+            data = urlencode(params)
+            request = Request(url, data)
+            try:
+                response = urlopen(request)
+            except URLError as e:
+                print "URL Error: {0}".format(e.reason)
+                return None
+            
+            try:
+                rsplit = response.read().split(None, 1)
+                return rsplit[0]
+            except:
+                return None
+        else:
+            return None
+    
     def fetchDetailsFromUniProt(self, uniprotid):
         "Fetch details from the UniProt database"
         details = {}
@@ -196,32 +194,127 @@ class FetchDetails:
 
         dom = etree.parse(response).getroot()
         details['function'] = dom.xpath('string(u:entry/u:comment[@type="function"]/u:text/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['unigene'] = dom.xpath('string(u:entry/u:dbReference[@type="UniGene"][1]/@id)', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['name'] = dom.xpath('string(u:entry/u:protein/u:recommendedName/u:fullName/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['symbol'] = dom.xpath('string(u:entry/u:gene/u:name/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['uniprot'] = dom.xpath('string(u:entry/u:accession[1]/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+
+        details['interactions'] = []
+        for i in dom.xpath('u:entry/u:comment[@type="interaction"]/u:interactant/u:label/text()', namespaces={'u': 'http://uniprot.org/uniprot'}):
+            details['interactions'].append("".join(i))
+
+        details['GO'] = []#{'function': [], 'component': [], 'process': []}
+        for g in dom.xpath('u:entry/u:dbReference[@type="GO"]', namespaces={'u': 'http://uniprot.org/uniprot'}):
+            go_id = g.xpath('string(@id)')
+            go_term = g.xpath('string(u:property[@type="term"]/@value)', namespaces={'u': 'http://uniprot.org/uniprot'}).split(':', 1)
+            '''
+            if go_term[0] == 'P':
+                group = 'process'
+            elif go_term[0] == 'F':
+                group = 'function'
+            else:
+                group = 'component'
+            '''
+            details['GO'].append({'id': go_id, 'term': go_term[1], 'type': go_term[0]}) 
 
         return details
 
-    def fetchDetailsFromEPD(self, acc_num):
-        "Fetch details from EPD using an SRS query"
+    def fetchDetailsFromEntrez(self, entrez_id):
+        "Fetch details from NCBI entrez gene (Braving the mess that is NCBI XML)"
         details = {}
-
-        return details
-
-    def fetchDetailsFromRefSeq(self, entrez_id):
-        "Fetch details from RefSeq"
-        details = {}
-        
-        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"#?db=refseq&tool=DigitalAgeingAtlas&retmode=xml&id="
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         params = {
-            'db': 'refseq',
+            'db': 'gene',
             'tool': 'DigitalAgeingAtlas',
             'retmode': 'xml',
             'id': entrez_id,
         }
         data = urlencode(params)
-        print data
         request = Request(url, data)
         try:
             response = urlopen(request)
         except URLError as e:
             print "URL Error: {0}".format(e.reason)
             return None
-        print response.read()
+
+        dom = etree.parse(response).getroot().getchildren()[0]
+        #gene = dom.getchildren()[0]
+
+        details['symbol'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_locus/text())')
+        details['name'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_desc/text())')
+        details['description'] = dom.xpath('string(Entrezgene_summary/text())')
+
+        details['chromosome_location'] = dom.xpath('string(Entrezgene_location/Maps/Maps_display-str/text())')
+        details['location_start'] = dom.xpath('string(Entrezgene_locus/Gene-commentary/Gene-commentary_seqs/Seq-loc/Seq-loc_int/Seq-interval/Seq-interval_from/text())')
+        details['location_end'] = dom.xpath('string(Entrezgene_locus/Gene-commentary/Gene-commentary_seqs/Seq-loc/Seq-loc_int/Seq-interval/Seq-interval_to/text())')
+        orientation = dom.xpath('string(Entrezgene_locus/Gene-commentary/Gene-commentary_seqs/Seq-loc/Seq-loc_int/Seq-interval/Seq-interval_strand/Na-strand/@value)')
+        if orientation == 'plus':
+            details['orientation'] = 1
+        else:
+            details['orientation'] = -1
+
+        details['unigene'] = dom.xpath('string(Entrezgene_comments/Gene-commentary/Gene-commentary_heading[.="Additional Links"]/../Gene-commentary_comment/Gene-commentary/Gene-commentary_text[.="UniGene"]/../Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_str/text())')[3:]
+        details['omim'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="MIM"]/../Dbtag_tag/Object-id/Object-id_id/text())')
+        details['ensembl'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="Ensembl"]/../Dbtag_tag/Object-id/Object-id_str/text())')
+        details['hprd'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="HPRD"]/../Dbtag_tag/Object-id/Object-id_str/text())')
+
+        details['species'] = dom.xpath('string(Entrezgene_source/BioSource/BioSource_org/Org-ref/Org-ref_common/text())')
+
+        details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
+        
+        alias_list = dom.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn')
+        if len(alias_list) > 0:
+            for alias in alias_list:
+                if alias.text.strip() != '':
+                    details['alias'] += ' '+alias.text
+
+        details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
+
+        return details
+        
+    def fetchDetailsFromNucleotide(self, nuc_id):
+        "Fetch sequence details from NCBI Nucleotide database"
+        details = {}
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        for get_type in ('fasta_cds_na', 'fasta_cds_aa'):
+            params = {
+                'db': 'nuccore',
+                'tool': 'DigitalAgeingAtlas',
+                'rettype': get_type,
+                'id': nuc_id,
+            }
+            data = urlencode(params)
+            request = Request(url, data)
+            try:
+                response = urlopen(request)
+            except URLError as e:
+                print "URL Error: {0}".format(e.reason)
+                return None
+            fasta_list = response.read().split('\n')
+            identifiers = re.search('(NM_.*)\.[0-9]_cdsid_(NP_[0-9].*)\.[0-9]\s', fasta_list[0])
+            details['acc_orf'] = identifiers.group(1)
+            details['acc_cds'] = identifiers.group(2)
+            if get_type == 'fasta_cds_na':
+                details['seq_orf'] = "".join(fasta_list[1:-1])
+            else:
+                details['seq_cds'] = "".join(fasta_list[1:-1])
+
+        return details
+
+    def fetchDetailsFromHPRD(self, symbol):
+        "Fetch details from HPRD using API on Alfred server"
+        details = {}
+        url = "http://alfred.liv.ac.uk/api/hprd/"
+        params = {
+            'symbol': symbol,
+        }
+        data = urlencode(params)
+        request = Request(url, data)
+
+        response = urlopen(request)
+        try:
+            response = urlopen(request)
+        except URLError as e:
+            print "URL Error: {0}".format(e.reason)
+            return None
+        return response.read()
