@@ -253,6 +253,8 @@ class FetchDetails:
         else:
             details['orientation'] = -1
 
+        details['accession'] = dom.xpath('string(Entrezgene_locus/Gene-commentary/Gene-commentary_label[.="RefSeqGene"]/../Gene-commentary_accession/text())')
+
         details['unigene'] = dom.xpath('string(Entrezgene_comments/Gene-commentary/Gene-commentary_heading[.="Additional Links"]/../Gene-commentary_comment/Gene-commentary/Gene-commentary_text[.="UniGene"]/../Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_str/text())')[3:]
         details['omim'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="MIM"]/../Dbtag_tag/Object-id/Object-id_id/text())')
         details['ensembl'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="Ensembl"]/../Dbtag_tag/Object-id/Object-id_str/text())')
@@ -262,6 +264,7 @@ class FetchDetails:
 
         details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
         
+        details['alias'] = ''
         alias_list = dom.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn')
         if len(alias_list) > 0:
             for alias in alias_list:
