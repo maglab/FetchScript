@@ -3,6 +3,7 @@ from urllib2 import urlopen, URLError, Request
 from urllib import urlencode
 import re
 
+""" DEPRECIATED: PLEASE USE FetchDetails CLASS """
 class FetchGene:
     "Fetch gene details from the NCBI Entrez database"
     
@@ -109,16 +110,16 @@ class FetchReference:
             lastName1stAuthor = authors[0].xpath('string(LastName/text())') if authors[0].xpath('string(LastName/text())') != '' else authors[0].xpath('string(LastName/text())')
             initials1stAuthor = authors[0].xpath('string(Initials/text())')
             if len(authors) > 2:
-                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+' et al.'
+                extracted['author'] = lastName1stAuthor+' et al' #+', '+initials1stAuthor+' et al.'
                 extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+' et al.'
             elif len(authors) == 2:
                 firstName2ndAuthor = authors[1].xpath('string(ForeName/text())') if authors[1].xpath('string(ForeName/text())') != '' else authors[1].xpath('string(FirstName/text())')
                 lastName2ndAuthor = authors[1].xpath('string(LastName/text())') if authors[1].xpath('string(LastName/text())') != '' else authors[1].xpath('string(LastName/text())')
                 initials2ndAuthor = authors[1].xpath('string(Initials/text())')
-                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+' and '+lastName2ndAuthor+', '+initials2ndAuthor
+                extracted['author'] = lastName1stAuthor+' and '+lastName2ndAuthor #+', '+initials1stAuthor+' and '+lastName2ndAuthor+', '+initials2ndAuthor
                 extracted['author_initials'] = lastName1stAuthor+', '+'.'.join(list(initials1stAuthor))+'. and '+lastName2ndAuthor+', '+'.'.join(list(initials2ndAuthor))+'.'
             else:
-                extracted['author'] = lastName1stAuthor+', '+initials1stAuthor+'.'
+                extracted['author'] = lastName1stAuthor #+', '+initials1stAuthor+'.'
                 extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+'.'
 
             pubTypes = article.xpath('PublicationTypeList/PublicationType')
@@ -171,6 +172,27 @@ class FetchDetails:
                 return None
         else:
             return None
+
+    def symbolToEntrezGeneID(self, symbol, organism='human'):
+        "Fetch a gene id based on a gene symbol"
+        details = {}
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        params = {
+            'db': 'gene',
+            'tool': 'DigitalAgeingAtlas',
+            'term': '{0}[gene name] AND {1}[organism]'.format(symbol, organism)
+        }
+        data = urlencode(params)
+        request = Request(url, data)
+        try:
+            response = urlopen(request)
+        except URLError as e:
+            print "URL Error: {0}".format(e.reason)
+            return None
+
+        dom = etree.parse(response).getroot()
+        tid = dom.xpath('string(IdList/Id/text())')
+        return tid
     
     def fetchDetailsFromUniProt(self, uniprotid):
         "Fetch details from the UniProt database"
@@ -264,12 +286,13 @@ class FetchDetails:
 
         details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
         
-        details['alias'] = ''
-        alias_list = dom.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn')
+        aliases = []
+        alias_list = dom.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn/Gene-ref_syn_E')
         if len(alias_list) > 0:
             for alias in alias_list:
                 if alias.text.strip() != '':
-                    details['alias'] += ' '+alias.text
+                    aliases.append(alias.text.strip())
+        details['alias'] = ' '.join(aliases)
 
         details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
 
@@ -321,3 +344,35 @@ class FetchDetails:
             print "URL Error: {0}".format(e.reason)
             return None
         return response.read()
+
+    def fetchDetailsFromdbSNP(self, identifier):
+        """Fetch details from NCBI dbSNP""" 
+        details = {}
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        params = {
+            'db': 'snp',
+            'tool': 'DigitalAgeingAtlas',
+            'retmode': 'xml',
+            'id': identifier,
+        }
+        data = urlencode(params)
+        request = Request(url, data)
+        try:
+            response = urlopen(request)
+        except URLError as e:
+            print "URL Error: {0}".format(e.reason)
+            return None
+
+        dom = etree.parse(response).getroot()#.getchildren()[0]
+
+        details = {}
+
+        fxn = dom.xpath('s:Rs/s:Assembly[@reference="true"]/s:Component/s:MapLoc/s:FxnSet', namespaces={'s': 'http://www.ncbi.nlm.nih.gov/SNP/docsum'})
+        gene_id = None
+        if len(fxn) > 0:
+            gene_id = fxn[0].attrib['geneId']
+        details['entrez_id'] = gene_id 
+
+        return details
+
+
