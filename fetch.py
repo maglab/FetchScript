@@ -373,6 +373,6 @@ class FetchDetails:
             gene_id = fxn[0].attrib['geneId']
         details['entrez_id'] = gene_id 
 
+        details['from'] = dom.xpath('string(s:Rs/s:Assembly[@reference="true"]/s:Component/s:MapLoc/@asnFrom)', namespaces={'s': 'http://www.ncbi.nlm.nih.gov/SNP/docsum'})
+
         return details
-
-
