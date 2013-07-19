@@ -110,7 +110,7 @@ class FetchReference:
             lastName1stAuthor = authors[0].xpath('string(LastName/text())') if authors[0].xpath('string(LastName/text())') != '' else authors[0].xpath('string(LastName/text())')
             initials1stAuthor = authors[0].xpath('string(Initials/text())')
             if len(authors) > 2:
-                extracted['author'] = lastName1stAuthor+' et al' #+', '+initials1stAuthor+' et al.'
+                extracted['author'] = lastName1stAuthor+' et al.' #+', '+initials1stAuthor+' et al.'
                 extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+' et al.'
             elif len(authors) == 2:
                 firstName2ndAuthor = authors[1].xpath('string(ForeName/text())') if authors[1].xpath('string(ForeName/text())') != '' else authors[1].xpath('string(FirstName/text())')
