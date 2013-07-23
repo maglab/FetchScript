@@ -200,7 +200,7 @@ class FetchDetails:
         return tid
 
     def symbolToEntrezGeneID(self, symbol, organism='human'):
-        self.convertToEntrezID(symbol, organism=organism)
+        self.convertToEntrezGeneID(symbol, organism=organism)
         """
         "Fetch a gene id based on a gene symbol"
         details = {}
