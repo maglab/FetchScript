@@ -173,7 +173,35 @@ class FetchDetails:
         else:
             return None
 
+    def convertToEntrezGeneID(self, identifier, to='symbol', organism='human'):
+        "Fetch a gene id based on an identifier, e.g. a symbol or accession number"
+        if to == 'accession':
+            term = '{0}[accession] AND {1}[organism]'.format(identifier, organism)
+        else:
+            term = '{0}[gene name] AND {1}[organism]'.format(identifier, organism)
+
+        details = {}
+        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+        params = {
+            'db': 'gene',
+            'tool': 'DigitalAgeingAtlas',
+            'term': term, 
+        }
+        data = urlencode(params)
+        request = Request(url, data)
+        try:
+            response = urlopen(request)
+        except URLError as e:
+            print "URL Error: {0}".format(e.reason)
+            return None
+
+        dom = etree.parse(response).getroot()
+        tid = dom.xpath('string(IdList/Id/text())')
+        return tid
+
     def symbolToEntrezGeneID(self, symbol, organism='human'):
+        self.convertToEntrezID(symbol, organism=organism)
+        """
         "Fetch a gene id based on a gene symbol"
         details = {}
         url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -193,7 +221,8 @@ class FetchDetails:
         dom = etree.parse(response).getroot()
         tid = dom.xpath('string(IdList/Id/text())')
         return tid
-    
+        """
+
     def fetchDetailsFromUniProt(self, uniprotid):
         "Fetch details from the UniProt database"
         details = {}
@@ -371,6 +400,11 @@ class FetchDetails:
         gene_id = None
         if len(fxn) > 0:
             gene_id = fxn[0].attrib['geneId']
+        if gene_id is None:
+            ps = dom.xpath('string(s:Rs/s:PrimarySequence/@accession)', namespaces={'s': 'http://www.ncbi.nlm.nih.gov/SNP/docsum'})
+            if ps != '':
+                gene_id = self.convertToEntrezGeneID(ps, to='accession')
+
         details['entrez_id'] = gene_id 
 
         details['from'] = dom.xpath('string(s:Rs/s:Assembly[@reference="true"]/s:Component/s:MapLoc/@asnFrom)', namespaces={'s': 'http://www.ncbi.nlm.nih.gov/SNP/docsum'})
