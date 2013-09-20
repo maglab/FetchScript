@@ -106,6 +106,7 @@ class FetchReference:
                 extracted['pages'] = pages
                 
             authors = article.xpath('AuthorList')[0]
+
             firstName1stAuthor = authors[0].xpath('string(ForeName/text())') if authors[0].xpath('string(ForeName/text())') != '' else authors[0].xpath('string(FirstName/text())')
             lastName1stAuthor = authors[0].xpath('string(LastName/text())') if authors[0].xpath('string(LastName/text())') != '' else authors[0].xpath('string(LastName/text())')
             initials1stAuthor = authors[0].xpath('string(Initials/text())')
@@ -121,6 +122,14 @@ class FetchReference:
             else:
                 extracted['author'] = lastName1stAuthor #+', '+initials1stAuthor+'.'
                 extracted['author_initials'] = lastName1stAuthor+', '+initials1stAuthor+'.'
+
+            extracted['authors'] = []
+            for a in authors:
+                extracted['authors'].append({
+                    'first_name': a.xpath('string(ForeName/text())'),
+                    'last_name': a.xpath('string(LastName/text())'),
+                    'initials': a.xpath('string(Initials/text())')
+                })
 
             pubTypes = article.xpath('PublicationTypeList/PublicationType')
             for ptype in pubTypes:
