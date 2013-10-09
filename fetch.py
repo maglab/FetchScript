@@ -145,6 +145,17 @@ class FetchReference:
                     for s in t:
                         currentTerm += s.text+'/'
                     extracted['terms'].append(currentTerm.rstrip('/'))
+
+            affiliation = dom.xpath('string(/PubmedArticleSet/PubmedArticle/MedlineCitation/Article/Affiliation/text())')
+            addresses = re.findall(r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}\b', affiliation, flags=re.IGNORECASE)
+            if len(addresses) > 0:
+                address_list = []
+                for a in addresses:
+                    address_list.append(a)
+                extracted['contact_addresses'] = ",".join(address_list)
+            else:
+                extracted['contact_addresses'] = ''
+
             return extracted
         return {}
     
