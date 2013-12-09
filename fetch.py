@@ -278,15 +278,13 @@ class FetchDetails:
         for g in dom.xpath('u:entry/u:dbReference[@type="GO"]', namespaces={'u': 'http://uniprot.org/uniprot'}):
             go_id = g.xpath('string(@id)')
             go_term = g.xpath('string(u:property[@type="term"]/@value)', namespaces={'u': 'http://uniprot.org/uniprot'}).split(':', 1)
-            '''
-            if go_term[0] == 'P':
-                group = 'process'
-            elif go_term[0] == 'F':
-                group = 'function'
-            else:
-                group = 'component'
-            '''
             details['GO'].append({'id': go_id, 'term': go_term[1], 'type': go_term[0]}) 
+
+        details['Pfam'] = []
+        for g in dom.xpath('u:entry/u:dbReference[@type="Pfam"]', namespaces={'u': 'http://uniprot.org/uniprot'}):
+            pfam_id = g.xpath('string(@id)')
+            entry_name = g.xpath('string(u:property[@type="entry name"]/@value)', namespaces={'u': 'http://uniprot.org/uniprot'})
+            details['Pfam'].append({'id': pfam_id, 'entry_name': entry_name}) 
 
         return details
 
@@ -344,6 +342,16 @@ class FetchDetails:
         details['alias'] = ' '.join(aliases)
 
         details['homologene'] = dom.xpath('string(Entrezgene_homology/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
+
+        details['go'] = []
+        go_cat = dom.xpath('Entrezgene_properties/Gene-commentary/Gene-commentary_heading[.="GeneOntology"]/../Gene-commentary_comment/Gene-commentary')
+        for cat in go_cat:
+            category = cat.xpath('string(Gene-commentary_label/text())')
+            terms = cat.xpath('Gene-commentary_comment/Gene-commentary')
+            for t in terms: 
+                gid = t.xpath('string(Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_id/text())')
+                gname = t.xpath('string(Gene-commentary_source/Other-source/Other-source_anchor/text())')
+                details['go'].append({'go': gid, 'name': gname, 'type': category})
 
         return details
         
