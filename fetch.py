@@ -310,6 +310,9 @@ class FetchDetails:
         #gene = dom.getchildren()[0]
 
         details['symbol'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_locus/text())')
+        # Sometimes symbol isn't actually there, it's here: 
+        if details['symbol'] == '':
+            details['symbol'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_locus-tag/text())')
         details['name'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_desc/text())')
         details['description'] = dom.xpath('string(Entrezgene_summary/text())')
 
