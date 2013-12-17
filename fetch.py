@@ -314,6 +314,8 @@ class FetchDetails:
         if details['symbol'] == '':
             details['symbol'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_locus-tag/text())')
         details['name'] = dom.xpath('string(Entrezgene_gene/Gene-ref/Gene-ref_desc/text())')
+        if details['name'] == '':
+            details['name'] = dom.xpath('string(Entrezgene_prot/Prot-ref/Prot-ref_name/Prot-ref_name_E/text())')
         details['description'] = dom.xpath('string(Entrezgene_summary/text())')
 
         details['chromosome_location'] = dom.xpath('string(Entrezgene_location/Maps/Maps_display-str/text())')
