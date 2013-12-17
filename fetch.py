@@ -268,7 +268,8 @@ class FetchDetails:
         details['unigene'] = dom.xpath('string(u:entry/u:dbReference[@type="UniGene"][1]/@id)', namespaces={'u': 'http://uniprot.org/uniprot'})
         details['name'] = dom.xpath('string(u:entry/u:protein/u:recommendedName/u:fullName/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
         details['symbol'] = dom.xpath('string(u:entry/u:gene/u:name/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
-        details['uniprot'] = dom.xpath('string(u:entry/u:accession[1]/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['uniprot_accession'] = dom.xpath('string(u:entry/u:accession[1]/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
+        details['uniprot'] = dom.xpath('string(u:entry/u:name/text())', namespaces={'u': 'http://uniprot.org/uniprot'})
 
         details['interactions'] = []
         for i in dom.xpath('u:entry/u:comment[@type="interaction"]/u:interactant/u:label/text()', namespaces={'u': 'http://uniprot.org/uniprot'}):
