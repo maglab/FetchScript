@@ -2,6 +2,9 @@ from lxml import etree
 from urllib2 import urlopen, URLError, Request
 from urllib import urlencode
 import re
+import ConfigParser
+import json
+import pprint
 
 """ DEPRECIATED: PLEASE USE FetchDetails CLASS """
 class FetchGene:
@@ -160,6 +163,14 @@ class FetchReference:
         return {}
     
 class FetchDetails:
+
+    def __init__(self, config_location='fetch.cfg'):
+        config = ConfigParser.ConfigParser()
+        config.read(config_location)
+
+        self.biogrid_key = None
+        if config.has_option('access_keys', 'biogrid'):
+            self.biogrid_key = config.get('access_keys', 'biogrid')
 
     def translateID(self, id, translate_from, translate_to):
         allowed_translations = (
@@ -341,6 +352,7 @@ class FetchDetails:
         
         aliases = []
         alias_list = dom.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn/Gene-ref_syn_E')
+        print alias_list
         if len(alias_list) > 0:
             for alias in alias_list:
                 if alias.text.strip() != '':
@@ -442,5 +454,31 @@ class FetchDetails:
         details['entrez_id'] = gene_id 
 
         details['from'] = dom.xpath('string(s:Rs/s:Assembly[@reference="true"]/s:Component/s:MapLoc/@asnFrom)', namespaces={'s': 'http://www.ncbi.nlm.nih.gov/SNP/docsum'})
+
+        return details
+
+    def fetchDetailsFromBioGrid(self, identifier, tax_id):
+        details = {}
+        url = 'http://webservice.thebiogrid.org/interactions'
+        if self.biogrid_key is not None:
+            params = {
+                'searchNames': True,
+                'geneList': identifier,
+                'includeInteractors': True,
+                'includeInteractorInteractions': False,
+                'taxId': tax_id,
+                'accesskey': self.biogrid_key,
+                'format': 'json',
+            }
+            data = urlencode(params)
+            request = Request(url, data)
+            try:
+                response = urlopen(request)
+            except URLError as e:
+                print "URL Error: {0}".format(e.reason)
+                return None
+            details = json.loads(response.read())
+        else:
+            return None
 
         return details
