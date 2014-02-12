@@ -466,6 +466,7 @@ class FetchDetails:
                 'geneList': identifier,
                 'includeInteractors': True,
                 'includeInteractorInteractions': False,
+                'additionalIdentifierTypes': 'ENTREZ_GENE',
                 'taxId': tax_id,
                 'accesskey': self.biogrid_key,
                 'format': 'json',
