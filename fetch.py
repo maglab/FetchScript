@@ -256,7 +256,9 @@ class FetchDetails:
 
     def fetchDetailsFromUniProt(self, uniprotid):
         "Fetch details from the UniProt database"
-        details = {}
+        details = {
+            'fetch_db_name': 'uniprot',
+        }
         
         url = 'http://www.ebi.ac.uk/Tools/dbfetch/dbfetch'
         params = {
@@ -302,7 +304,9 @@ class FetchDetails:
 
     def fetchDetailsFromEntrez(self, entrez_id):
         "Fetch details from NCBI entrez gene (Braving the mess that is NCBI XML)"
-        details = {}
+        details = {
+            'fetch_db_name': 'entrez',
+        }
         url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         params = {
             'db': 'gene',
@@ -375,7 +379,9 @@ class FetchDetails:
         
     def fetchDetailsFromNucleotide(self, nuc_id):
         "Fetch sequence details from NCBI Nucleotide database"
-        details = {}
+        details = {
+            'fetch_db_name': 'nucleotide',
+        }
         url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         for get_type in ('fasta_cds_na', 'fasta_cds_aa'):
             params = {
@@ -404,7 +410,12 @@ class FetchDetails:
 
     def fetchDetailsFromHPRD(self, symbol):
         "Fetch details from HPRD using API on Alfred server"
-        details = {}
+        """
+        THIS HAS BEEN DEPRECIATED AND WILL BE REMOVED. HPRD IS NO LONGER BEING UPDATED.
+        """
+        details = {
+            'fetch_db_name': 'HPRD',
+        }
         url = "http://alfred.liv.ac.uk/api/hprd/"
         params = {
             'symbol': symbol,
@@ -422,7 +433,9 @@ class FetchDetails:
 
     def fetchDetailsFromdbSNP(self, identifier):
         """Fetch details from NCBI dbSNP""" 
-        details = {}
+        details = {
+            'fetch_db_name': 'dbSNP',
+        }
         url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         params = {
             'db': 'snp',
@@ -458,7 +471,9 @@ class FetchDetails:
         return details
 
     def fetchDetailsFromBioGrid(self, identifier, tax_id):
-        details = {}
+        details = {
+            'fetch_db_name': 'BioGrid',
+        }
         url = 'http://webservice.thebiogrid.org/interactions'
         if self.biogrid_key is not None:
             params = {
