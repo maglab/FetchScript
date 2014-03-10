@@ -1,3 +1,10 @@
+"""
+.. module:: fetch
+   :synopsis: Fetch details from external databases and return in a sane manner
+
+.. moduleauthor:: Thomas Craig <thomas.craig@tjc.me.uk>
+
+"""
 from lxml import etree
 from urllib2 import urlopen, URLError, Request
 from urllib import urlencode
@@ -6,58 +13,20 @@ import ConfigParser
 import json
 import pprint
 
-""" DEPRECIATED: PLEASE USE FetchDetails CLASS """
-class FetchGene:
-    "Fetch gene details from the NCBI Entrez database"
-    
-    def __ie(self, item):
-        "Check if an item exists in list, if not, return none"
-        if len(item) > 0:
-            return item[0]
-        else:
-            return None
-    
-    def fetchEntrez(self, entrez_id):
-        "Fetch a gene its entrez gene id"
-        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=gene&tool=DigitalAgeingAtlas&retmode=xml&id="
-        try:
-            dom = etree.parse(urlopen(url+str(entrez_id))).getroot()
-        except URLError:
-            print "error in URL: "+URLError.reason
-            
-        gene = dom.getchildren()[0]
-        
-        extracted = {}
-        
-        extracted['entrez_id'] = self.__ie(gene.xpath('Entrezgene_track-info/Gene-track/Gene-track_geneid/text()'))
-        extracted['symbol'] = self.__ie(gene.xpath('Entrezgene_gene/Gene-ref/Gene-ref_locus/text()'))
-        extracted['name'] = self.__ie(gene.xpath('Entrezgene_gene/Gene-ref/Gene-ref_desc/text()'))
-        extracted['description'] = self.__ie(gene.xpath('Entrezgene_summary/text()'))#gene.xpath('Entrezgene_prot/Prot-ref/Prot-ref_desc/text()'))
-        
-        extracted['unigene'] = self.__ie(gene.xpath('Entrezgene_comments/Gene-commentary/Gene-commentary_heading[.="Additional Links"]/../Gene-commentary_comment/Gene-commentary/Gene-commentary_text[.="UniGene"]/../Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_tag/Object-id/Object-id_str/text()'))
-        extracted['uniprot'] = self.__ie(gene.xpath('Entrezgene_comments/Gene-commentary/Gene-commentary_heading[. = "NCBI Reference Sequences (RefSeq)"]/../Gene-commentary_comment/Gene-commentary/Gene-commentary_products/Gene-commentary/Gene-commentary_products/Gene-commentary/Gene-commentary_comment/Gene-commentary/Gene-commentary_heading[.="UniProtKB"]/../Gene-commentary_comment/Gene-commentary/Gene-commentary_source/Other-source/Other-source_src/Dbtag/Dbtag_db[.="UniProtKB/Swiss-Prot"]/../Dbtag_tag/Object-id/Object-id_str/text()'))
-        extracted['omim'] = self.__ie(gene.xpath('Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="MIM"]/../Dbtag_tag/Object-id/Object-id_id/text()'))
-        extracted['ensembl'] = self.__ie(gene.xpath('Entrezgene_gene/Gene-ref/Gene-ref_db/Dbtag/Dbtag_db[.="Ensembl"]/../Dbtag_tag/Object-id/Object-id_str/text()'))
-
-        extracted['species'] = self.__ie(gene.xpath('Entrezgene_source/BioSource/BioSource_org/Org-ref/Org-ref_common/text()'))
-        
-        alias_list = gene.xpath('Entrezgene_gene/Gene-ref/Gene-ref_syn')
-        if len(alias_list) > 0:
-            for alias in alias_list:
-                if alias.text.strip() != '':
-                    extracted['alias'] += ' '+alias.text
-        
-        return extracted
-    
-    def fetchSymbol(self, symbol, species):
-        "Fetch a gene its symbol and species"
-        pass
-        
 class FetchReference:
-    "Fetch a reference from the NCBI Pubmed database"
+    """Fetch a reference from the NCBI Pubmed database"""
     
     def __ie(self, item, makeNum=False):
-        "Check if an item exists in list, if not, return none"
+        """Check if an item exists in list, if not, return none
+        
+        Args:
+            item (XMLNode): An xml node to check if exists
+            makeNum (bool): Turn the value into a number
+
+        Returns:
+            String item
+
+        """
         if len(item) > 0:
             if makeNum:
                 return re.sub("[^0-9]", "", item[0])
@@ -67,7 +36,16 @@ class FetchReference:
             return None
     
     def fetchPubmed(self, pubmed, withTerms=False):
-        "Use a pubmed ID to fetch a reference from the PubMed database"
+        """Use a pubmed ID to fetch a reference from the PubMed database
+
+        Args:
+            pubmed (int): An NCBI Pubmed ID to fetch
+            withTerms (bool): Fetch MeSH terms with the reference
+
+        Returns:
+            dict. Results from PubMed for the ID
+        
+        """
         
         url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&tool=FetchScript&retmode=xml&id="
         try:
@@ -163,16 +141,29 @@ class FetchReference:
         return {}
     
 class FetchDetails:
+    """ Fetch details from external databases """
 
     def __init__(self, config_location='fetch.cfg'):
         config = ConfigParser.ConfigParser()
         config.read(config_location)
 
+        """ You'll need an API key to connect to BioGrid """
         self.biogrid_key = None
         if config.has_option('access_keys', 'biogrid'):
             self.biogrid_key = config.get('access_keys', 'biogrid')
 
     def translateID(self, id, translate_from, translate_to):
+        """ Translate from one database ID to another
+        
+            Args:
+                id (str): The ID to translate
+                translate_from (str): The database to translte the ID from
+                translate_to (str): The database to translate the ID to
+
+            Returns:
+                str. The translated ID or None if nothing to translate
+        
+        """
         allowed_translations = (
             'P_ENTREZGENEID', # Entrez gene ID
             'ID', # UniProt ID - !! can only translate TO !!
@@ -205,7 +196,17 @@ class FetchDetails:
             return None
 
     def convertToEntrezGeneID(self, identifier, to='symbol', organism='human'):
-        "Fetch a gene id based on an identifier, e.g. a symbol or accession number"
+        """Fetch a gene id based on an identifier, e.g. a symbol or accession number
+        
+        Args:
+            identifier (int): Identifier to convert (e.g. symbol)
+            to (str): symbol or accession
+            organism: The organism that the ID's are for
+
+        Returns:
+            str. The translated ID
+        
+        """
         if to == 'accession':
             term = '{0}[accession] AND {1}[organism]'.format(identifier, organism)
         else:
@@ -231,31 +232,28 @@ class FetchDetails:
         return tid
 
     def symbolToEntrezGeneID(self, symbol, organism='human'):
-        self.convertToEntrezGeneID(symbol, organism=organism)
-        """
-        "Fetch a gene id based on a gene symbol"
-        details = {}
-        url = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-        params = {
-            'db': 'gene',
-            'tool': 'DigitalAgeingAtlas',
-            'term': '{0}[gene name] AND {1}[organism]'.format(symbol, organism)
-        }
-        data = urlencode(params)
-        request = Request(url, data)
-        try:
-            response = urlopen(request)
-        except URLError as e:
-            print "URL Error: {0}".format(e.reason)
-            return None
+        """ Wrapper function around convertToEntrezID to covert symbol to entrez ID
+        
+        Args:
+            symbol (str): The symbol to convert to entrez ID
+            organism (str): The organism that the ID's are for
 
-        dom = etree.parse(response).getroot()
-        tid = dom.xpath('string(IdList/Id/text())')
-        return tid
+        Returns:
+            str. The translated ID
+
         """
+        self.convertToEntrezGeneID(symbol, organism=organism)
 
     def fetchDetailsFromUniProt(self, uniprotid):
-        "Fetch details from the UniProt database"
+        """Fetch details from the UniProt database
+        
+        Args:
+            uniprotid (str): The uniprot ID to fetch details on
+
+        Returns:
+            dict. Details from the UniProt database
+
+        """
         details = {
             'fetch_db_name': 'uniprot',
         }
@@ -303,7 +301,15 @@ class FetchDetails:
         return details
 
     def fetchDetailsFromEntrez(self, entrez_id):
-        "Fetch details from NCBI entrez gene (Braving the mess that is NCBI XML)"
+        """Fetch details from NCBI entrez gene (Braving the mess that is NCBI XML)
+        
+        Args:
+            entrez_id (int): The Entrez Gene ID to fetch details for
+
+        Returns:
+            dict. Details from the NCBI Entrez database
+        
+        """
         details = {
             'fetch_db_name': 'entrez',
         }
@@ -378,7 +384,15 @@ class FetchDetails:
         return details
         
     def fetchDetailsFromNucleotide(self, nuc_id):
-        "Fetch sequence details from NCBI Nucleotide database"
+        """Fetch sequence details from NCBI Nucleotide database
+        
+        Args:
+            nucleotide_id (str): Nucleotide ID to fetch
+
+        Returns:
+            dict. Details to fetch from the database
+        
+        """
         details = {
             'fetch_db_name': 'nucleotide',
         }
@@ -408,31 +422,16 @@ class FetchDetails:
 
         return details
 
-    def fetchDetailsFromHPRD(self, symbol):
-        "Fetch details from HPRD using API on Alfred server"
-        """
-        THIS HAS BEEN DEPRECIATED AND WILL BE REMOVED. HPRD IS NO LONGER BEING UPDATED.
-        """
-        details = {
-            'fetch_db_name': 'HPRD',
-        }
-        url = "http://alfred.liv.ac.uk/api/hprd/"
-        params = {
-            'symbol': symbol,
-        }
-        data = urlencode(params)
-        request = Request(url, data)
-
-        response = urlopen(request)
-        try:
-            response = urlopen(request)
-        except URLError as e:
-            print "URL Error: {0}".format(e.reason)
-            return None
-        return response.read()
-
     def fetchDetailsFromdbSNP(self, identifier):
-        """Fetch details from NCBI dbSNP""" 
+        """Fetch details from NCBI dbSNP
+        
+        Args:
+            identifier (str): dbSNP identifier
+
+        Returns:
+            dict. The results from dbSNP
+        
+        """ 
         details = {
             'fetch_db_name': 'dbSNP',
         }
@@ -471,6 +470,16 @@ class FetchDetails:
         return details
 
     def fetchDetailsFromBioGrid(self, identifier, tax_id):
+        """Fetch details from the BioGrid database
+
+        Args:
+            identifier (str): An entrez ID to fetch details for
+            tax_id (int): An NCBI Taxonomy ID (e.g. 9606 for human)
+
+        Returns:
+            dict. Results from BioGrid
+
+        """
         details = {
             'fetch_db_name': 'BioGrid',
         }
